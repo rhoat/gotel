@@ -1,4 +1,4 @@
-package initialize
+package gotel
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-func newMeterProvider(ctx context.Context, res *resource.Resource) (*metric.MeterProvider, error) {
+func newMeterProvider(ctx context.Context, res *resource.Resource, cfg Config) (*metric.MeterProvider, error) {
 	metricExporter, err := otlpmetrichttp.New(ctx)
 	if err != nil {
 		return nil, err
@@ -17,7 +17,7 @@ func newMeterProvider(ctx context.Context, res *resource.Resource) (*metric.Mete
 		metric.WithResource(res),
 		metric.WithReader(metric.NewPeriodicReader(metricExporter,
 			// Default is 1m. Set to 3s for demonstrative purposes.
-			metric.WithInterval(metricInterval))),
+			metric.WithInterval(cfg.MetricInterval))),
 	)
 
 	return meterProvider, nil

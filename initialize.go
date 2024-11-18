@@ -1,4 +1,4 @@
-package initialize
+package gotel
 
 import (
 	"context"
@@ -10,20 +10,24 @@ import (
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, serviceName, serviceVersion string) (shutdownFunc, error) {
+func SetupOTelSDK(ctx context.Context, serviceName, serviceVersion string, options ...CfgOptionFunc) (shutdownFunc, error) {
 	var shutdownFuncs []func(context.Context) error
-
+	cfg := baseCfg
 	// Set up propagator.
 	prop := newPropagator()
 	otel.SetTextMapPropagator(prop)
-
+	for _, opt := range options {
+		if err := opt(&cfg); err != nil {
+			return nil, err
+		}
+	}
 	res, err := newResource(serviceName, serviceVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	// Set up trace provider.
-	tracerProvider, err := newTraceProvider(ctx, res)
+	tracerProvider, err := newTraceProvider(ctx, res, cfg)
 	if err != nil {
 		return nil, handleErrors(err, generateShutdownFunc(shutdownFuncs), ctx)
 	}
@@ -31,14 +35,14 @@ func SetupOTelSDK(ctx context.Context, serviceName, serviceVersion string) (shut
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	meterProvider, err := newMeterProvider(ctx, res)
+	meterProvider, err := newMeterProvider(ctx, res, cfg)
 	if err != nil {
 		return nil, handleErrors(err, generateShutdownFunc(shutdownFuncs), ctx)
 	}
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
 	// Set up log provider.
-	loggerProvider, err := newLoggerProvider(ctx, res)
+	loggerProvider, err := newLoggerProvider(ctx, res, cfg)
 	if err != nil {
 		panic(err)
 	}

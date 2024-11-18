@@ -1,4 +1,4 @@
-package initialize
+package gotel
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-func newLoggerProvider(ctx context.Context, res *resource.Resource) (*log.LoggerProvider, error) {
+func newLoggerProvider(ctx context.Context, res *resource.Resource, cfg Config) (*log.LoggerProvider, error) {
 	exporter, err := otlploghttp.New(ctx)
 	if err != nil {
 		return nil, err
