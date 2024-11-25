@@ -3,7 +3,6 @@ package gotel
 import (
 	"time"
 
-	"github.com/rhoat/go-exercise/pkg/system"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -23,12 +22,14 @@ var (
 )
 
 func NewConfig(
+	applicationName,
+	buildVersion string,
 	traceExporter trace.SpanExporter,
 	metricExporter metric.Exporter,
 	logExporter log.Exporter,
 	opts ...CfgOptionFunc,
 ) (*Config, error) {
-	res, err := newResource(system.ApplicationName, system.BuildVersion)
+	res, err := newResource(applicationName, buildVersion)
 	if err != nil {
 		return nil, err
 	}

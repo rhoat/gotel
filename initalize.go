@@ -10,14 +10,15 @@ import (
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, destination Destination, options ...CfgOptionFunc) error {
+func SetupOTelSDK(ctx context.Context, applicationName,
+	buildVersion string, destination Destination, options ...CfgOptionFunc) error {
 	var shutdownFuncs []func(context.Context) error
 	traceExporter, metricExporter, logExporter, err := setupExporters(ctx, destination)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := NewConfig(traceExporter, metricExporter, logExporter, options...)
+	cfg, err := NewConfig(applicationName, buildVersion, traceExporter, metricExporter, logExporter, options...)
 	if err != nil {
 		return err
 	}
