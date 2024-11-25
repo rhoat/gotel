@@ -1,29 +1,55 @@
 package gotel
 
-import "time"
+import (
+	"time"
+
+	"github.com/rhoat/go-exercise/pkg/system"
+	"go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/trace"
+)
 
 type Config struct {
-	TraceBatchTimeout time.Duration
-	MetricInterval    time.Duration
-}
-
-var baseCfg = Config{
-	TraceBatchTimeout: 5 * time.Second,
-	MetricInterval:    time.Minute,
+	TracerProviderOption []trace.TracerProviderOption
+	MetricProviderOption []metric.Option
+	LoggerProviderOption []log.LoggerProviderOption
 }
 
 type CfgOptionFunc func(c *Config) error
 
-func WithTraceBatchTimeout(timeout time.Duration) CfgOptionFunc {
-	return func(c *Config) error {
-		c.TraceBatchTimeout = timeout
-		return nil
-	}
-}
+var (
+	traceBatchTimeout = 5 * time.Second
+	metricInterval    = time.Minute
+)
 
-func WithMetricInterval(timeout time.Duration) CfgOptionFunc {
-	return func(c *Config) error {
-		c.MetricInterval = timeout
-		return nil
+func NewConfig(
+	traceExporter trace.SpanExporter,
+	metricExporter metric.Exporter,
+	logExporter log.Exporter,
+	opts ...CfgOptionFunc,
+) (*Config, error) {
+	res, err := newResource(system.ApplicationName, system.BuildVersion)
+	if err != nil {
+		return nil, err
 	}
+
+	cfg := Config{
+		TracerProviderOption: []trace.TracerProviderOption{
+			trace.WithBatcher(traceExporter,
+				trace.WithBatchTimeout(traceBatchTimeout)),
+			trace.WithResource(res),
+		},
+		MetricProviderOption: []metric.Option{
+			metric.WithResource(res),
+			metric.WithReader(metric.NewPeriodicReader(metricExporter, metric.WithInterval(metricInterval))),
+		},
+		LoggerProviderOption: []log.LoggerProviderOption{log.WithResource(res),
+			log.WithProcessor(log.NewBatchProcessor(logExporter))},
+	}
+	for _, opt := range opts {
+		if err = opt(&cfg); err != nil {
+			return nil, err
+		}
+	}
+	return &cfg, nil
 }

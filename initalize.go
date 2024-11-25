@@ -10,46 +10,37 @@ import (
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOTelSDK(ctx context.Context, serviceName, serviceVersion string, options ...CfgOptionFunc) (shutdownFunc, error) {
+func SetupOTelSDK(ctx context.Context, destination Destination, options ...CfgOptionFunc) error {
 	var shutdownFuncs []func(context.Context) error
-	cfg := baseCfg
+	traceExporter, metricExporter, logExporter, err := setupExporters(ctx, destination)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := NewConfig(traceExporter, metricExporter, logExporter, options...)
+	if err != nil {
+		return err
+	}
 	// Set up propagator.
 	prop := newPropagator()
 	otel.SetTextMapPropagator(prop)
-	for _, opt := range options {
-		if err := opt(&cfg); err != nil {
-			return nil, err
-		}
-	}
-	res, err := newResource(serviceName, serviceVersion)
-	if err != nil {
-		return nil, err
-	}
 
 	// Set up trace provider.
-	tracerProvider, err := newTraceProvider(ctx, res, cfg)
-	if err != nil {
-		return nil, handleErrors(err, generateShutdownFunc(shutdownFuncs), ctx)
-	}
+	tracerProvider := newTraceProvider(*cfg)
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	meterProvider, err := newMeterProvider(ctx, res, cfg)
-	if err != nil {
-		return nil, handleErrors(err, generateShutdownFunc(shutdownFuncs), ctx)
-	}
+	meterProvider := newMeterProvider(*cfg)
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
 	// Set up log provider.
-	loggerProvider, err := newLoggerProvider(ctx, res, cfg)
-	if err != nil {
-		panic(err)
-	}
+	loggerProvider := newLoggerProvider(*cfg)
 
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 	global.SetLoggerProvider(loggerProvider)
-	return generateShutdownFunc(shutdownFuncs), nil
+	ShutDown = generateShutdownFunc(shutdownFuncs)
+	return nil
 }
 
 func newPropagator() propagation.TextMapPropagator {
